@@ -6,27 +6,33 @@
 #include<iterator>
 
 namespace HashConstants {
-    const int TO_RELOAD = 4;
-    const int INIT_SIZE = 4;
+    constexpr int TO_RELOAD = 4;
+    constexpr int INIT_SIZE = 4;
 }
 template<class KeyType, class ValueType, class Hash = std::hash<KeyType>>
 class HashMap {
 private:
     size_t alpha = 0; // number of inserted and deleted elements
     size_t element_count = 0;
+    size_t begin_index = -1;
     Hash hasher;
     std::vector<std::shared_ptr<std::pair<const KeyType, ValueType>>> elements;
     std::vector<char> filled;
 
-    void simple_insert(std::pair<KeyType, ValueType>& cur, std::vector<std::shared_ptr<std::pair<const KeyType, ValueType>>>& tmp_elements, std::vector<char>& now_fill) noexcept {
+    void simple_insert(const std::pair<KeyType, ValueType>& cur,
+                       std::vector<std::shared_ptr<std::pair<const KeyType, ValueType>>>& tmp_elements,
+                       std::vector<char>& now_fill) noexcept {
         size_t current_hash = hasher(cur.first) % tmp_elements.size();
-        while (now_fill[current_hash] == -1 || (now_fill[current_hash] == 1 && !(tmp_elements[current_hash]->first  == cur.first))) {
+        while (now_fill[current_hash] == -1 ||
+               (now_fill[current_hash] == 1 && !(tmp_elements[current_hash]->first == cur.first))) {
             current_hash = (current_hash + 1) % tmp_elements.size();
         }
         if (now_fill[current_hash] == 1)
             return;
         now_fill[current_hash] = 1;
-        tmp_elements[current_hash] = std::make_shared<std::pair<const KeyType, ValueType>>(std::pair<const KeyType, ValueType>(cur.first, cur.second));
+        if (begin_index > current_hash)
+            begin_index = current_hash;
+        tmp_elements[current_hash] = std::make_shared<std::pair<const KeyType, ValueType>>(cur.first, cur.second);
         ++element_count;
         ++alpha;
     }
@@ -34,6 +40,7 @@ private:
     void reload(size_t new_size) noexcept {
         element_count = 0;
         alpha = 0;
+        begin_index = -1;
         std::vector<std::shared_ptr<std::pair<const KeyType, ValueType>>> new_elements(new_size);
         std::vector<char> new_fill(new_size);
         for (size_t i = 0; i < elements.size(); ++i) {
@@ -52,15 +59,15 @@ public:
         return *elements[index];
     }
 
-    const std::pair<const KeyType, ValueType>& get_val(int index) const noexcept{
+    const std::pair<const KeyType, ValueType>& get_val(int index) const noexcept {
         return *elements[index];
     }
 
-    char get_fil(int index) const noexcept {
+    char get_filled(int index) const noexcept {
         return filled[index];
     }
 
-    class iterator : public std::iterator<std::forward_iterator_tag,HashMap<KeyType, ValueType>*> {
+    class iterator : public std::iterator<std::forward_iterator_tag, HashMap<KeyType, ValueType>*> {
     private:
         HashMap* par;
         size_t index;
@@ -85,7 +92,7 @@ public:
             if ((*this) == par->end())
                 return (*this);
             ++index;
-            while ((*this) != par->end() && par->get_fil(index) != 1)
+            while ((*this) != par->end() && par->get_filled(index) != 1)
                 ++index;
             return (*this);
         }
@@ -96,7 +103,7 @@ public:
             return tmp;
         }
 
-        int get_ind() const {
+        size_t get_ind() const {
             return index;
         }
 
@@ -126,7 +133,7 @@ public:
             return &(par->get_val(index));
         }
 
-        int get_ind() const {
+        size_t get_ind() const {
             return index;
         }
 
@@ -134,7 +141,7 @@ public:
             if ((*this) == par->end())
                 return (*this);
             ++index;
-            while ((*this) != par->end() && par->get_fil(index) != 1)
+            while ((*this) != par->end() && par->get_filled(index) != 1)
                 ++index;
             return (*this);
         }
@@ -149,10 +156,7 @@ public:
     iterator begin() noexcept {
         if (element_count == 0)
             return iterator(this, elements.size());
-        int current_hash = 0;
-        while (filled[current_hash] != 1)
-            ++current_hash;
-        return iterator(this, current_hash);
+        return iterator(this, begin_index);
     }
 
     iterator end() noexcept {
@@ -162,10 +166,7 @@ public:
     const_iterator begin() const noexcept {
         if (element_count == 0)
             return const_iterator(this, elements.size());
-        int current_hash = 0;
-        while (filled[current_hash] != 1)
-            ++current_hash;
-        return const_iterator(this, current_hash);
+        return const_iterator(this, begin_index);
     }
 
     const_iterator end() const {
@@ -176,10 +177,11 @@ public:
         if (elements.size() == 0)
             return iterator(this, elements.size());
         size_t current_hash = hasher(cur) % elements.size();
-        while (filled[current_hash] == -1 || (filled[current_hash] == 1 && !(elements[current_hash]->first  == cur))) {
+        while (filled[current_hash] == -1 ||
+               (filled[current_hash] == 1 && !(elements[current_hash]->first == cur))) {
             current_hash = (current_hash + 1) % elements.size();
         }
-        if (filled[current_hash] == 1 && elements[current_hash]->first  == cur)
+        if (filled[current_hash] == 1 && elements[current_hash]->first == cur)
             return iterator(this, current_hash);
         return iterator(this, elements.size());
     }
@@ -188,9 +190,10 @@ public:
         if (elements.size() == 0)
             return const_iterator(this, elements.size());
         size_t current_hash = hasher(cur) % elements.size();
-        while (filled[current_hash] == -1 || (filled[current_hash] == 1 && !(elements[current_hash]->first  == cur)))
+        while (filled[current_hash] == -1 ||
+               (filled[current_hash] == 1 && !(elements[current_hash]->first == cur)))
             current_hash = (current_hash + 1) % elements.size();
-        if (filled[current_hash] == 1 && elements[current_hash]->first  == cur)
+        if (filled[current_hash] == 1 && elements[current_hash]->first == cur)
             return const_iterator(this, current_hash);
         return const_iterator(this, elements.size());
     }
@@ -207,13 +210,14 @@ public:
 
     HashMap(Hash tmp_hasher): alpha(0), element_count(0), hasher(tmp_hasher), elements(0), filled(0) {}
 
-    void insert(std::pair<KeyType, ValueType> cur) noexcept {
+    void insert(const std::pair<KeyType, ValueType>& cur) noexcept {
         if (element_count == 0)
             reload(HashConstants::INIT_SIZE);
         if ((alpha + 1) * 2 > elements.size())
             reload(HashConstants::TO_RELOAD * element_count);
-        if (find(cur.first) == end())
+        if (find(cur.first) == end()) {
             simple_insert(cur, elements, filled);
+        }
     }
 
     void erase(KeyType del) noexcept {
@@ -223,6 +227,13 @@ public:
         filled[pos.get_ind()] = -1;
         elements[pos.get_ind()].reset();
         --element_count;
+        if (element_count == 0)
+            begin_index = 0;
+        else if (pos.get_ind() == begin_index) {
+            begin_index = 0;
+            while (filled[begin_index] != 1)
+                ++begin_index;
+        }
         if (element_count * HashConstants::TO_RELOAD < elements.size())
             reload(HashConstants::TO_RELOAD * element_count >> 1);
     }
@@ -240,21 +251,19 @@ public:
     }
 
     HashMap(std::initializer_list<std::pair<KeyType, ValueType>> init) noexcept {
-        for (auto& cur : init)
+        for (const auto& cur : init)
             insert(cur);
     }
 
     HashMap(std::initializer_list<std::pair<KeyType, ValueType>> init, Hash tmp_hasher) : alpha(0), element_count(0), hasher(tmp_hasher), elements(0), filled(0) {
-        for (auto& cur : init)
+        for (const auto& cur : init)
             insert(cur);
     }
 
     HashMap(HashMap<KeyType, ValueType, Hash>& other): alpha(0), element_count(0), hasher(other.hasher), elements(0), filled(0) {
-        for (size_t i = 0; i < other.elements.size(); ++i) {
-            if (other.filled[i] != 1)
-                continue;
-            insert(*(other.elements[i]));
-        }
+        for (const auto& current : other.elements)
+            if (current != nullptr)
+                insert(*current);
     }
 
     size_t size() const noexcept {
@@ -295,9 +304,5 @@ public:
             insert(*(other.elements[i]));
         }
         return (*this);
-    }
-
-    ~HashMap() noexcept {
-        clear();
     }
 };
