@@ -30,8 +30,7 @@ private:
         if (now_fill[current_hash] == 1)
             return;
         now_fill[current_hash] = 1;
-        if (begin_index > current_hash)
-            begin_index = current_hash;
+        begin_index = std::min(begin_index, current_hash);
         tmp_elements[current_hash] = std::make_shared<std::pair<const KeyType, ValueType>>(cur.first, cur.second);
         ++element_count;
         ++alpha;
@@ -45,15 +44,13 @@ private:
         std::vector<char> new_fill(new_size);
         for (size_t i = 0; i < elements.size(); ++i) {
             if (filled[i] == 1) {
-                std::pair<KeyType, ValueType> to_insert = (*elements[i]);
+                auto to_insert = (*elements[i]);
                 simple_insert(to_insert, new_elements, new_fill);
             }
         }
         swap(elements, new_elements);
         swap(filled, new_fill);
     }
-
-public:
 
     std::pair<const KeyType, ValueType>& get_val(int index) noexcept {
         return *elements[index];
@@ -67,10 +64,20 @@ public:
         return filled[index];
     }
 
+public:
+
     class iterator : public std::iterator<std::forward_iterator_tag, HashMap<KeyType, ValueType>*> {
+
+    friend class HashMap;
+
     private:
         HashMap* par;
         size_t index;
+
+        size_t get_ind() const {
+            return index;
+        }
+
     public:
         iterator(): par(0), index(0) {}
         iterator(HashMap* par_v, size_t in): par(par_v), index(in) {}
@@ -103,16 +110,19 @@ public:
             return tmp;
         }
 
-        size_t get_ind() const {
-            return index;
-        }
-
     };
 
     class const_iterator : public std::iterator<std::forward_iterator_tag, const HashMap<KeyType, ValueType>*> {
+
+    friend class HashMap;
+
     private:
         const HashMap * par;
         size_t index;
+
+        size_t get_ind() const {
+            return index;
+        }
     public:
         const_iterator(): par(0), index(0) {}
 
@@ -131,10 +141,6 @@ public:
         }
         const std::pair<const KeyType, ValueType>* operator ->() const {
             return &(par->get_val(index));
-        }
-
-        size_t get_ind() const {
-            return index;
         }
 
         const_iterator& operator++() {
